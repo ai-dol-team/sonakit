@@ -1,0 +1,12 @@
+services:
+  sonakit:
+    image: sonakit:local
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "62793:62793"
+    environment:
+      GUNICORN_WORKERS: "1"
+      GUNICORN_TIMEOUT: "120"
+    restart: unless-stopped
