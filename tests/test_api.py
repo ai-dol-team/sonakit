@@ -5,11 +5,20 @@ from fastapi.testclient import TestClient
 from PIL import Image
 
 from sonakit.app import app
+from sonakit.capabilities.video_thumbnail import service as video_thumbnail_service
 from sonakit.core.config import get_settings
 
 
-@pytest.fixture(scope="module")
-def client() -> TestClient:
+@pytest.fixture
+def client(monkeypatch: pytest.MonkeyPatch) -> TestClient:
+    real_which = video_thumbnail_service.shutil.which
+    monkeypatch.setattr(
+        video_thumbnail_service.shutil,
+        "which",
+        lambda binary: (
+            f"/test/{binary}" if binary in {"ffmpeg", "ffprobe"} else real_which(binary)
+        ),
+    )
     with TestClient(app) as test_client:
         yield test_client
 
@@ -32,6 +41,7 @@ def test_platform_health_and_capability_registry(client: TestClient) -> None:
         "image_compression",
         "image_conversion",
         "qr_code",
+        "video_thumbnail",
     }
 
 
@@ -132,6 +142,7 @@ def test_openapi_contains_all_public_endpoints(client: TestClient) -> None:
         "/api/v1/image/convert",
         "/api/v1/qrcode/generate",
         "/api/v1/qrcode/recognize",
+        "/api/v1/video/thumbnail",
     }
 
     watermark_operation = openapi.json()["paths"]["/api/v1/image/watermark"]["post"]

@@ -8,6 +8,7 @@ SonaKit 是一个通用能力服务平台。项目采用 API First 和单点能�
 - JPEG、PNG、WebP 图片压缩
 - JPEG、PNG、WebP 格式转换
 - 二维码生成与识别
+- 远程视频 JPEG 封面抽帧
 
 ## 目录设计
 
@@ -174,6 +175,34 @@ curl -X POST http://localhost:62793/api/v1/image/convert \
 
 图片中没有可读取二维码时返回 `400` 和 `qr_code_not_found`。
 
+## 视频封面抽帧
+
+`POST /api/v1/video/thumbnail`，请求类型为 `application/json`。服务端通过 `ffprobe`
+探测远程 HTTP(S) 视频时长，再通过 `ffmpeg` 流式输出单个 JPEG 帧；不会将完整视频下载到
+Python 内存。
+
+| 字段 | 必填 | 默认值 | 规则 |
+|---|---:|---|---|
+| `video_url` | 是 | - | 服务端可访问的 HTTP(S) 视频 URL |
+| `prefer_first_frame` | 否 | `true` | 优先尝试 0.1、0.3、0.5 秒处的帧 |
+| `fallback_random_window_seconds` | 否 | `3.0` | 0.1-3.0 秒的早期随机兜底窗口 |
+| `max_output_width` | 否 | `1080` | 320-1080px，保持原始比例 |
+| `frame_selection_strategy` | 否 | `near_start` | `near_start` 或 `random_cover` |
+| `random_min_ratio` | 否 | `0.15` | `random_cover` 的最小时间比例，0-0.95 |
+| `random_max_ratio` | 否 | `0.85` | `random_cover` 的最大时间比例，0-0.98，且不得小于最小值 |
+| `random_candidate_count` | 否 | `3` | `random_cover` 的分段候选数，1-5 |
+
+```bash
+curl -X POST http://localhost:62793/api/v1/video/thumbnail \
+  -H 'Content-Type: application/json' \
+  -d '{"video_url":"https://cdn.example.com/video.mp4","frame_selection_strategy":"random_cover"}' \
+  --output preview.jpg
+```
+
+成功时响应为 `image/jpeg`，并带有 `X-Frame-Time-Seconds`、`X-Frame-Strategy` 和
+`X-Source-Duration-Seconds`。缺少 `ffprobe` 或 `ffmpeg` 时服务会在启动阶段失败；远端视频
+不可用或无法处理时返回 `502`，排队、探测和抽帧共享 60 秒处理截止时间，超时返回 `504`。
+
 ## 错误状态
 
 | 状态码 | 含义 |
@@ -182,6 +211,9 @@ curl -X POST http://localhost:62793/api/v1/image/convert \
 | `413` | 上传大小、解码像素或图片边长超限 |
 | `415` | 图片实际格式不支持 |
 | `422` | 表单或 JSON 参数类型、范围、枚举不合法 |
+| `502` | 远端视频无法探测、读取或解码 |
+| `503` | 必需的运行时能力不可用 |
+| `504` | 远端视频处理超时 |
 
 ## 配置
 
@@ -195,6 +227,10 @@ curl -X POST http://localhost:62793/api/v1/image/convert \
 | `SONAKIT_MAX_IMAGE_PIXELS` | `40000000` |
 | `SONAKIT_MAX_IMAGE_DIMENSION` | `16384` |
 | `SONAKIT_IMAGE_CONCURRENCY` | `2` |
+| `SONAKIT_VIDEO_THUMBNAIL_CONCURRENCY` | `2` |
+| `SONAKIT_VIDEO_THUMBNAIL_MAX_DURATION_SECONDS` | `1800` |
+| `SONAKIT_VIDEO_THUMBNAIL_MAX_OUTPUT_WIDTH` | `1080` |
+| `SONAKIT_VIDEO_THUMBNAIL_TOTAL_TIMEOUT_SECONDS` | `60` |
 | `SONAKIT_CORS_ORIGINS` | `[]`，JSON 数组 |
 
 ## 本地开发

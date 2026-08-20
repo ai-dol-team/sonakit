@@ -56,6 +56,10 @@ app = FastAPI(
             "name": "QR Code",
             "description": "Generate PNG QR codes and recognize QR codes in images.",
         },
+        {
+            "name": "Video Thumbnail",
+            "description": "Extract a JPEG cover frame from a remote HTTP(S) video.",
+        },
     ],
     swagger_ui_parameters={"displayRequestDuration": True, "tryItOutEnabled": True},
     lifespan=lifespan,
@@ -79,6 +83,9 @@ if settings.cors_origins:
             "X-Source-Bytes",
             "X-Output-Bytes",
             "X-Compression-Ratio",
+            "X-Frame-Time-Seconds",
+            "X-Frame-Strategy",
+            "X-Source-Duration-Seconds",
         ],
     )
 
